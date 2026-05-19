@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { sql } from "@/lib/db";
 import { ADMIN_AUTH_COOKIE, verifyAdminToken } from "@/lib/auth";
+import { DeleteDocButton } from "./DeleteDocButton";
 
 export const metadata: Metadata = { title: "Application Detail – Prime Trucking" };
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ function Row({ label, value, flag }: { label: string; value: string | null | und
   );
 }
 
-function DocLink({ label, url, expiry, required }: { label: string; url: string | null | undefined; expiry?: string | null; required?: boolean }) {
+function DocLink({ label, url, expiry, required, deleteButton }: { label: string; url: string | null | undefined; expiry?: string | null; required?: boolean; deleteButton?: React.ReactNode }) {
   const today = new Date();
   const expiryDate = expiry ? new Date(expiry) : null;
   const daysLeft = expiryDate ? Math.ceil((expiryDate.getTime() - today.getTime()) / 86400000) : null;
@@ -58,9 +59,12 @@ function DocLink({ label, url, expiry, required }: { label: string; url: string 
         )}
       </div>
       {url ? (
-        <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-orange-500 hover:text-orange-600 px-3 py-1.5 border border-orange-200 rounded-lg hover:border-orange-300 transition-colors shrink-0">
-          View / Download
-        </a>
+        <div className="flex items-center gap-2 shrink-0">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-orange-500 hover:text-orange-600 px-3 py-1.5 border border-orange-200 rounded-lg hover:border-orange-300 transition-colors">
+            View / Download
+          </a>
+          {deleteButton}
+        </div>
       ) : (
         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${required ? "bg-red-100 text-red-600" : "text-gray-400 italic"}`}>
           {required ? "⚠ Missing" : "Not uploaded"}
@@ -127,11 +131,11 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             <h2 className={`text-sm font-semibold uppercase tracking-wide mb-4 ${missingRequired ? "text-amber-700" : "text-gray-500"}`}>
               {missingRequired ? "⚠ Uploaded Documents — Required Docs Missing" : "Uploaded Documents"}
             </h2>
-            <DocLink label="CDL — Front" url={app.doc_cdl_front as string} expiry={app.cdl_expiry as string} required />
-            <DocLink label="CDL — Back" url={app.doc_cdl_back as string} required />
-            <DocLink label="DOT Medical Certificate" url={app.doc_medical as string} expiry={app.medical_expiry as string} required />
-            <DocLink label="Motor Vehicle Record (MVR)" url={app.doc_mvr as string} expiry={app.mvr_date as string} />
-            {(app.doc_other as string | null) && <DocLink label="Other Document" url={app.doc_other as string} />}
+            <DocLink label="CDL — Front" url={app.doc_cdl_front as string} expiry={app.cdl_expiry as string} required deleteButton={app.doc_cdl_front ? <DeleteDocButton appId={id} field="doc_cdl_front" url={app.doc_cdl_front as string} /> : undefined} />
+            <DocLink label="CDL — Back" url={app.doc_cdl_back as string} required deleteButton={app.doc_cdl_back ? <DeleteDocButton appId={id} field="doc_cdl_back" url={app.doc_cdl_back as string} /> : undefined} />
+            <DocLink label="DOT Medical Certificate" url={app.doc_medical as string} expiry={app.medical_expiry as string} required deleteButton={app.doc_medical ? <DeleteDocButton appId={id} field="doc_medical" url={app.doc_medical as string} /> : undefined} />
+            <DocLink label="Motor Vehicle Record (MVR)" url={app.doc_mvr as string} expiry={app.mvr_date as string} deleteButton={app.doc_mvr ? <DeleteDocButton appId={id} field="doc_mvr" url={app.doc_mvr as string} /> : undefined} />
+            {(app.doc_other as string | null) && <DocLink label="Other Document" url={app.doc_other as string} deleteButton={<DeleteDocButton appId={id} field="doc_other" url={app.doc_other as string} />} />}
           </div>
         );
       })()}
