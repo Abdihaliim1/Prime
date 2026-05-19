@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { sql } from "@/lib/db";
+import { ADMIN_AUTH_COOKIE, verifyAdminToken } from "@/lib/auth";
 import ApplicationsClient from "./ApplicationsClient";
 
 export const metadata: Metadata = { title: "Applications – Prime Trucking" };
@@ -39,8 +40,8 @@ async function getApplications(): Promise<Application[]> {
 export default async function ApplicationsPage() {
   // Auth already enforced by proxy — double-check server-side
   const cookieStore = await cookies();
-  const auth = cookieStore.get("pt-admin-auth")?.value;
-  if (auth !== "1") return null;
+  const auth = cookieStore.get(ADMIN_AUTH_COOKIE)?.value;
+  if (!(await verifyAdminToken(auth))) return null;
 
   const applications = await getApplications();
   const dbReady = applications !== null;

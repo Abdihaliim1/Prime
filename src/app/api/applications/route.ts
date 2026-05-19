@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sql } from "@/lib/db";
+import { ADMIN_AUTH_COOKIE, verifyAdminToken } from "@/lib/auth";
 
 // POST /api/applications — public, called when driver submits the apply form
 export async function POST(req: NextRequest) {
@@ -74,8 +75,8 @@ export async function POST(req: NextRequest) {
 
 // GET /api/applications — admin only
 export async function GET(req: NextRequest) {
-  const auth = req.cookies.get("pt-admin-auth")?.value;
-  if (auth !== "1") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = req.cookies.get(ADMIN_AUTH_COOKIE)?.value;
+  if (!(await verifyAdminToken(auth))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
     const { rows } = await sql`

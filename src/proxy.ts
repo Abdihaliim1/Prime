@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ADMIN_AUTH_COOKIE, verifyAdminToken } from "@/lib/auth";
 
 const PROTECTED = ["/dashboard", "/applications", "/drivers", "/documents"];
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isProtected = PROTECTED.some(
@@ -11,8 +12,8 @@ export function proxy(request: NextRequest) {
 
   if (!isProtected) return NextResponse.next();
 
-  const auth = request.cookies.get("pt-admin-auth")?.value;
-  if (auth === "1") return NextResponse.next();
+  const auth = request.cookies.get(ADMIN_AUTH_COOKIE)?.value;
+  if (await verifyAdminToken(auth)) return NextResponse.next();
 
   const loginUrl = request.nextUrl.clone();
   loginUrl.pathname = "/login";
