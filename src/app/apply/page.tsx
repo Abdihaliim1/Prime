@@ -328,7 +328,7 @@ export default function ApplyPage() {
         </div>
       </header>
 
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="max-w-3xl mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Title */}
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold text-gray-900">{tr.tagline}</h1>
@@ -340,51 +340,51 @@ export default function ApplyPage() {
           <div className="flex items-center justify-between mb-2">
             {tr.steps.map((s, i) => (
               <div key={i} className={`flex flex-col items-center gap-1 flex-1 ${i < tr.steps.length - 1 ? "relative" : ""}`}>
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold z-10 ${i < step ? "bg-orange-500 text-white" : i === step ? "bg-orange-500 text-white ring-4 ring-orange-100" : "bg-gray-200 text-gray-500"}`}>
+                <div className={`w-6 h-6 md:w-7 md:h-7 rounded-full flex items-center justify-center text-xs font-semibold z-10 ${i < step ? "bg-orange-500 text-white" : i === step ? "bg-orange-500 text-white ring-4 ring-orange-100" : "bg-gray-200 text-gray-500"}`}>
                   {i < step ? (
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                   ) : i + 1}
                 </div>
                 {i < tr.steps.length - 1 && (
-                  <div className={`absolute top-3.5 left-1/2 w-full h-0.5 -z-0 ${i < step ? "bg-orange-500" : "bg-gray-200"}`} />
+                  <div className={`absolute top-3 md:top-3.5 left-1/2 w-full h-0.5 -z-0 ${i < step ? "bg-orange-500" : "bg-gray-200"}`} />
                 )}
               </div>
             ))}
           </div>
           <p className="text-center text-xs text-gray-500 mt-3">
-            {lang === "en" ? `Step ${step + 1} of ${TOTAL}` : `Tallaabo ${step + 1} / ${TOTAL}`} — {tr.steps[step]}
+            {lang === "en" ? `Step ${step + 1} of ${TOTAL}` : `Tallaabo ${step + 1} / ${TOTAL}`} — <span className="font-medium">{tr.steps[step]}</span>
           </p>
         </div>
 
         {/* Form card */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 md:p-8">
 
           {/* STEP 1 — Personal Info */}
           {step === 0 && (
             <div className="space-y-5">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">{tr.s1Title}</h2>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Field label={tr.firstName} value={personal.firstName} onChange={(v) => setPersonal({ ...personal, firstName: v })} required />
                 <Field label={tr.middleName} value={personal.middleName} onChange={(v) => setPersonal({ ...personal, middleName: v })} />
                 <Field label={tr.lastName} value={personal.lastName} onChange={(v) => setPersonal({ ...personal, lastName: v })} required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={tr.dob} value={personal.dob} onChange={(v) => setPersonal({ ...personal, dob: v })} type="date" required />
                 <Field label={tr.ssn} value={personal.ssn} onChange={(v) => setPersonal({ ...personal, ssn: v })} maxLength={4} placeholder="####" required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={tr.phone} value={personal.phone} onChange={(v) => setPersonal({ ...personal, phone: v })} type="tel" required />
                 <Field label={tr.email} value={personal.email} onChange={(v) => setPersonal({ ...personal, email: v })} type="email" />
               </div>
               <Field label={tr.address} value={personal.address} onChange={(v) => setPersonal({ ...personal, address: v })} required />
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Field label={tr.city} value={personal.city} onChange={(v) => setPersonal({ ...personal, city: v })} required />
                 <SelectField label={tr.state} value={personal.state} onChange={(v) => setPersonal({ ...personal, state: v })} options={US_STATES} required />
                 <Field label={tr.zip} value={personal.zip} onChange={(v) => setPersonal({ ...personal, zip: v })} required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={tr.yearsAtAddress} value={personal.yearsAtAddress} onChange={(v) => setPersonal({ ...personal, yearsAtAddress: v })} type="number" />
                 <Field label={tr.prevAddress} value={personal.prevAddress} onChange={(v) => setPersonal({ ...personal, prevAddress: v })} />
               </div>
@@ -395,11 +395,11 @@ export default function ApplyPage() {
           {step === 1 && (
             <div className="space-y-5">
               <h2 className="text-lg font-semibold text-gray-900 mb-6">{tr.s2Title}</h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={tr.cdlNumber} value={license.cdlNumber} onChange={(v) => setLicense({ ...license, cdlNumber: v })} required />
                 <SelectField label={tr.cdlState} value={license.cdlState} onChange={(v) => setLicense({ ...license, cdlState: v })} options={US_STATES} required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <SelectField label={tr.cdlClass} value={license.cdlClass} onChange={(v) => setLicense({ ...license, cdlClass: v })} options={CDL_CLASSES} required />
                 <Field label={tr.cdlExpiry} value={license.cdlExpiry} onChange={(v) => setLicense({ ...license, cdlExpiry: v })} type="date" required />
               </div>
@@ -421,18 +421,18 @@ export default function ApplyPage() {
               {employers.map((emp, idx) => (
                 <div key={idx} className="border border-gray-200 rounded-xl p-5 space-y-4">
                   <p className="text-sm font-semibold text-gray-700">{lang === "en" ? `Employer ${idx + 1}` : `Shaqo-bixiye ${idx + 1}`}</p>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label={tr.empName} value={emp.name} onChange={(v) => { const a = [...employers]; a[idx].name = v; setEmployers(a); }} required />
                     <Field label={tr.empPhone} value={emp.phone} onChange={(v) => { const a = [...employers]; a[idx].phone = v; setEmployers(a); }} />
                   </div>
                   <Field label={tr.empAddress} value={emp.address} onChange={(v) => { const a = [...employers]; a[idx].address = v; setEmployers(a); }} />
                   <Field label={tr.empPosition} value={emp.position} onChange={(v) => { const a = [...employers]; a[idx].position = v; setEmployers(a); }} />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Field label={tr.empStart} value={emp.start} onChange={(v) => { const a = [...employers]; a[idx].start = v; setEmployers(a); }} type="date" required />
                     <Field label={tr.empEnd} value={emp.end} onChange={(v) => { const a = [...employers]; a[idx].end = v; setEmployers(a); }} type="date" />
                   </div>
                   <Field label={tr.empLeave} value={emp.leave} onChange={(v) => { const a = [...employers]; a[idx].leave = v; setEmployers(a); }} />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <YesNo label={tr.empFmcsa} value={emp.fmcsa} onChange={(v) => { const a = [...employers]; a[idx].fmcsa = v; setEmployers(a); }} lang={lang} />
                     <YesNo label={tr.empDrug} value={emp.drug} onChange={(v) => { const a = [...employers]; a[idx].drug = v; setEmployers(a); }} lang={lang} />
                   </div>
@@ -461,12 +461,12 @@ export default function ApplyPage() {
                     {accidents.map((acc, idx) => (
                       <div key={idx} className="border border-gray-200 rounded-xl p-4 space-y-3">
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{lang === "en" ? `Accident ${idx + 1}` : `Shil ${idx + 1}`}</p>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <Field label={tr.accDate} value={acc.date} onChange={(v) => { const a = [...accidents]; a[idx].date = v; setAccidents(a); }} type="date" />
                           <Field label={tr.accLocation} value={acc.location} onChange={(v) => { const a = [...accidents]; a[idx].location = v; setAccidents(a); }} />
                         </div>
                         <Field label={tr.accDesc} value={acc.desc} onChange={(v) => { const a = [...accidents]; a[idx].desc = v; setAccidents(a); }} textarea />
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <Field label={tr.accFatal} value={acc.fatal} onChange={(v) => { const a = [...accidents]; a[idx].fatal = v; setAccidents(a); }} type="number" />
                           <Field label={tr.accInj} value={acc.inj} onChange={(v) => { const a = [...accidents]; a[idx].inj = v; setAccidents(a); }} type="number" />
                         </div>
@@ -493,11 +493,11 @@ export default function ApplyPage() {
                     {violations.map((viol, idx) => (
                       <div key={idx} className="border border-gray-200 rounded-xl p-4 space-y-3">
                         <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{lang === "en" ? `Violation ${idx + 1}` : `Xadgudub ${idx + 1}`}</p>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <Field label={tr.violDate} value={viol.date} onChange={(v) => { const a = [...violations]; a[idx].date = v; setViolations(a); }} type="date" />
                           <Field label={tr.violLocation} value={viol.location} onChange={(v) => { const a = [...violations]; a[idx].location = v; setViolations(a); }} />
                         </div>
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           <Field label={tr.violCharge} value={viol.charge} onChange={(v) => { const a = [...violations]; a[idx].charge = v; setViolations(a); }} />
                           <Field label={tr.violPenalty} value={viol.penalty} onChange={(v) => { const a = [...violations]; a[idx].penalty = v; setViolations(a); }} />
                         </div>
@@ -549,7 +549,7 @@ export default function ApplyPage() {
                 <h3 className="text-base font-semibold text-gray-900 mb-2">{tr.certTitle}</h3>
                 <p className="text-sm text-gray-600 bg-gray-50 rounded-lg p-4 leading-relaxed">{tr.certText}</p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={tr.sigName} value={sig.name} onChange={(v) => setSig({ ...sig, name: v })} required />
                 <Field label={tr.sigDate} value={sig.date} onChange={(v) => setSig({ ...sig, date: v })} type="date" required />
               </div>
