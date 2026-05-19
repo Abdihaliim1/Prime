@@ -222,14 +222,14 @@ const EQUIPMENT = ["Semi Truck / 18-Wheeler", "Flatbed", "Refrigerated / Reefer"
 const CDL_CLASSES = ["Class A", "Class B", "Class C"];
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
-function FileInput({ label, lang }: { label: string; lang: Lang }) {
+function FileInput({ label, lang, onFile }: { label: string; lang: Lang; onFile?: (f: File | null) => void }) {
   const ref = useRef<HTMLInputElement>(null);
   const [name, setName] = useState("");
   const tr = t[lang];
   return (
     <div>
       <p className="text-sm font-medium text-gray-700 mb-1.5">{label}</p>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <button
           type="button"
           onClick={() => ref.current?.click()}
@@ -243,18 +243,34 @@ function FileInput({ label, lang }: { label: string; lang: Lang }) {
           type="file"
           accept=".pdf,.jpg,.jpeg,.png"
           className="hidden"
-          onChange={(e) => setName(e.target.files?.[0]?.name ?? "")}
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            setName(f?.name ?? "");
+            onFile?.(f);
+          }}
         />
       </div>
     </div>
   );
 }
 
+async function uploadFile(file: File, label: string): Promise<string | null> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("label", label);
+  const res = await fetch("/api/upload", { method: "POST", body: fd });
+  if (!res.ok) return null;
+  const { url } = await res.json();
+  return url as string;
+}
+
 export default function ApplyPage() {
   const [lang, setLang] = useState<Lang>("en");
   const [step, setStep] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [refId, setRefId] = useState("");
   const [loading, setLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
   const tr = t[lang];
 
   // Form state
@@ -268,19 +284,56 @@ export default function ApplyPage() {
   const [drug, setDrug] = useState({ positiveTest: "", refusedTest: "", returnDuty: "", sapdInfo: "" });
   const [sig, setSig] = useState({ name: "", date: "" });
 
+  // File state
+  const [files, setFiles] = useState<Record<string, File | null>>({
+    cdlFront: null, cdlBack: null, medical: null, mvr: null, other: null,
+  });
+
   const TOTAL = 6;
 
   function toggleArr(arr: string[], val: string): string[] {
     return arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     setLoading(true);
-    setTimeout(() => { setLoading(false); setSubmitted(true); }, 1200);
+    setSubmitError("");
+
+    try {
+      // Upload files concurrently (skip nulls)
+      const [cdlFront, cdlBack, medical, mvr, other] = await Promise.all([
+        files.cdlFront ? uploadFile(files.cdlFront, "cdl-front") : Promise.resolve(null),
+        files.cdlBack ? uploadFile(files.cdlBack, "cdl-back") : Promise.resolve(null),
+        files.medical ? uploadFile(files.medical, "medical") : Promise.resolve(null),
+        files.mvr ? uploadFile(files.mvr, "mvr") : Promise.resolve(null),
+        files.other ? uploadFile(files.other, "other") : Promise.resolve(null),
+      ]);
+
+      const res = await fetch("/api/applications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          personal, license, employers,
+          noAccidents, accidents,
+          noViolations, violations,
+          drug, sig,
+          docs: { cdlFront, cdlBack, medical, mvr, other },
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Submission failed");
+
+      setRefId(data.id);
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (submitted) {
-    const ref = "PT-" + Math.random().toString(36).slice(2, 8).toUpperCase();
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="bg-white rounded-2xl border border-gray-200 p-10 max-w-md w-full text-center shadow-sm">
@@ -293,7 +346,7 @@ export default function ApplyPage() {
           <p className="text-sm text-gray-600 mb-6">{tr.successText}</p>
           <div className="bg-gray-50 rounded-lg px-5 py-3">
             <p className="text-xs text-gray-500">{tr.successRef}</p>
-            <p className="text-lg font-mono font-semibold text-gray-900">{ref}</p>
+            <p className="text-lg font-mono font-semibold text-gray-900">{refId}</p>
           </div>
         </div>
       </div>
@@ -536,11 +589,11 @@ export default function ApplyPage() {
                 <p className="text-xs text-gray-500 mt-1">{tr.s6Note}</p>
               </div>
               <div className="space-y-4">
-                <FileInput label={tr.docCdlFront} lang={lang} />
-                <FileInput label={tr.docCdlBack} lang={lang} />
-                <FileInput label={tr.docMedical} lang={lang} />
-                <FileInput label={tr.docMvr} lang={lang} />
-                <FileInput label={tr.docOther} lang={lang} />
+                <FileInput label={tr.docCdlFront} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, cdlFront: f }))} />
+                <FileInput label={tr.docCdlBack} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, cdlBack: f }))} />
+                <FileInput label={tr.docMedical} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, medical: f }))} />
+                <FileInput label={tr.docMvr} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, mvr: f }))} />
+                <FileInput label={tr.docOther} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, other: f }))} />
               </div>
 
               <hr className="border-gray-200" />
@@ -556,8 +609,12 @@ export default function ApplyPage() {
             </div>
           )}
 
+          {submitError && (
+            <p className="mt-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{submitError}</p>
+          )}
+
           {/* Nav buttons */}
-          <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
+          <div className="flex items-center justify-between mt-6 pt-6 border-t border-gray-100">
             <button
               type="button"
               onClick={() => setStep(step - 1)}
