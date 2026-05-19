@@ -266,15 +266,15 @@ function FileInput({ label, lang, onFile }: { label: string; lang: Lang; onFile?
   );
 }
 
-async function uploadFile(file: File, label: string, appId: string): Promise<string | null> {
+async function uploadFile(file: File, label: string, appId: string): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("label", label);
   fd.append("appId", appId);
   const res = await fetch("/api/upload", { method: "POST", body: fd });
-  if (!res.ok) return null;
-  const { url } = await res.json();
-  return url as string;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `Failed to upload ${label} — check Blob storage is connected in Vercel.`);
+  return data.url as string;
 }
 
 export default function ApplyPage() {

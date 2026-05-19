@@ -24,16 +24,24 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   );
 }
 
-function Row({ label, value }: { label: string; value: string | null | undefined }) {
+function Row({ label, value, flag }: { label: string; value: string | null | undefined; flag?: boolean }) {
+  const isYes = value?.toLowerCase() === "yes";
+  const highlight = flag && isYes;
   return (
-    <div className="flex flex-col sm:flex-row sm:gap-4 py-2 border-b border-gray-50 last:border-0">
+    <div className={`flex flex-col sm:flex-row sm:gap-4 py-2 border-b border-gray-50 last:border-0 rounded ${highlight ? "bg-red-50 border-red-100 px-3 -mx-3" : ""}`}>
       <span className="text-xs font-medium text-gray-400 sm:w-48 shrink-0">{label}</span>
-      <span className="text-sm text-gray-900 mt-0.5 sm:mt-0">{value || <span className="text-gray-400 italic">—</span>}</span>
+      <span className={`text-sm mt-0.5 sm:mt-0 font-medium ${highlight ? "text-red-700" : "text-gray-900"}`}>
+        {value ? (
+          highlight ? <span className="flex items-center gap-1.5">⚠ {value.toUpperCase()}</span> : value
+        ) : (
+          <span className="text-gray-400 italic font-normal">—</span>
+        )}
+      </span>
     </div>
   );
 }
 
-function DocLink({ label, url, expiry }: { label: string; url: string | null | undefined; expiry?: string | null }) {
+function DocLink({ label, url, expiry, required }: { label: string; url: string | null | undefined; expiry?: string | null; required?: boolean }) {
   const today = new Date();
   const expiryDate = expiry ? new Date(expiry) : null;
   const daysLeft = expiryDate ? Math.ceil((expiryDate.getTime() - today.getTime()) / 86400000) : null;
@@ -54,7 +62,9 @@ function DocLink({ label, url, expiry }: { label: string; url: string | null | u
           View / Download
         </a>
       ) : (
-        <span className="text-xs text-gray-400 italic">Not uploaded</span>
+        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${required ? "bg-red-100 text-red-600" : "text-gray-400 italic"}`}>
+          {required ? "⚠ Missing" : "Not uploaded"}
+        </span>
       )}
     </div>
   );
@@ -110,13 +120,21 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       </div>
 
       {/* Documents — shown first since that's priority */}
-      <Section title="Uploaded Documents">
-        <DocLink label="CDL — Front" url={app.doc_cdl_front as string} expiry={app.cdl_expiry as string} />
-        <DocLink label="CDL — Back" url={app.doc_cdl_back as string} />
-        <DocLink label="DOT Medical Certificate" url={app.doc_medical as string} expiry={app.medical_expiry as string} />
-        <DocLink label="Motor Vehicle Record (MVR)" url={app.doc_mvr as string} expiry={app.mvr_date as string} />
-        {(app.doc_other as string | null) && <DocLink label="Other Document" url={app.doc_other as string} />}
-      </Section>
+      {(() => {
+        const missingRequired = !app.doc_cdl_front || !app.doc_cdl_back || !app.doc_medical;
+        return (
+          <div className={`rounded-xl border p-5 md:p-6 ${missingRequired ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"}`}>
+            <h2 className={`text-sm font-semibold uppercase tracking-wide mb-4 ${missingRequired ? "text-amber-700" : "text-gray-500"}`}>
+              {missingRequired ? "⚠ Uploaded Documents — Required Docs Missing" : "Uploaded Documents"}
+            </h2>
+            <DocLink label="CDL — Front" url={app.doc_cdl_front as string} expiry={app.cdl_expiry as string} required />
+            <DocLink label="CDL — Back" url={app.doc_cdl_back as string} required />
+            <DocLink label="DOT Medical Certificate" url={app.doc_medical as string} expiry={app.medical_expiry as string} required />
+            <DocLink label="Motor Vehicle Record (MVR)" url={app.doc_mvr as string} expiry={app.mvr_date as string} />
+            {(app.doc_other as string | null) && <DocLink label="Other Document" url={app.doc_other as string} />}
+          </div>
+        );
+      })()}
 
       {/* Personal Info */}
       <Section title="Personal Information">
@@ -163,49 +181,78 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       )}
 
       {/* Safety Record */}
-      <Section title="Safety Record">
-        {app.no_accidents ? (
-          <p className="text-sm text-gray-500">No accidents reported</p>
-        ) : accidents.length > 0 ? (
-          accidents.map((acc, i) => (
-            <div key={i} className={i > 0 ? "mt-4 pt-4 border-t border-gray-100" : ""}>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Accident {i + 1}</p>
-              <Row label="Date" value={acc.date} />
-              <Row label="Location" value={acc.location} />
-              <Row label="Description" value={acc.desc} />
-              <Row label="Fatalities" value={acc.fatal} />
-              <Row label="Injuries" value={acc.inj} />
+      {(() => {
+        const hasAccidents = !app.no_accidents && accidents.length > 0;
+        const hasViolations = !app.no_violations && violations.length > 0;
+        const hasFatalOrInjury = accidents.some(a => parseInt(a.fatal || "0") > 0 || parseInt(a.inj || "0") > 0);
+        const sectionFlag = hasFatalOrInjury ? "danger" : (hasAccidents || hasViolations) ? "warn" : "ok";
+        return (
+          <div className={`rounded-xl border p-5 md:p-6 ${sectionFlag === "danger" ? "bg-red-50 border-red-200" : sectionFlag === "warn" ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200"}`}>
+            <h2 className={`text-sm font-semibold uppercase tracking-wide mb-4 ${sectionFlag === "danger" ? "text-red-700" : sectionFlag === "warn" ? "text-amber-700" : "text-gray-500"}`}>
+              {sectionFlag === "danger" ? "⚠ Safety Record — FATALITY / INJURY REPORTED" : sectionFlag === "warn" ? "⚠ Safety Record — Accidents / Violations Present" : "Safety Record"}
+            </h2>
+
+            {app.no_accidents ? (
+              <p className="text-sm text-gray-500">No accidents reported</p>
+            ) : accidents.length > 0 ? (
+              accidents.map((acc, i) => {
+                const fatal = parseInt(acc.fatal || "0");
+                const inj = parseInt(acc.inj || "0");
+                const accFlag = fatal > 0 || inj > 0;
+                return (
+                  <div key={i} className={`${i > 0 ? "mt-4 pt-4 border-t border-red-100" : ""} ${accFlag ? "bg-red-100 rounded-lg p-3 -mx-1" : ""}`}>
+                    <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${accFlag ? "text-red-700" : "text-gray-500"}`}>
+                      {accFlag ? `⚠ Accident ${i + 1} — ${fatal > 0 ? `${fatal} FATALITY` : ""}${fatal > 0 && inj > 0 ? " · " : ""}${inj > 0 ? `${inj} INJURY` : ""}` : `Accident ${i + 1}`}
+                    </p>
+                    <Row label="Date" value={acc.date} />
+                    <Row label="Location" value={acc.location} />
+                    <Row label="Description" value={acc.desc} />
+                    <Row label="Fatalities" value={acc.fatal} />
+                    <Row label="Injuries" value={acc.inj} />
+                  </div>
+                );
+              })
+            ) : (
+              <p className="text-sm text-gray-500">No accidents recorded</p>
+            )}
+
+            <div className="mt-5 pt-5 border-t border-gray-200">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Traffic Violations</p>
+              {app.no_violations ? (
+                <p className="text-sm text-gray-500">No violations reported</p>
+              ) : violations.length > 0 ? (
+                violations.map((viol, i) => (
+                  <div key={i} className={`${i > 0 ? "mt-4 pt-4 border-t border-amber-100" : ""} bg-amber-50 rounded-lg p-3 -mx-1 mb-2`}>
+                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-2">⚠ Violation {i + 1}</p>
+                    <Row label="Date" value={viol.date} />
+                    <Row label="Location" value={viol.location} />
+                    <Row label="Charge" value={viol.charge} />
+                    <Row label="Penalty" value={viol.penalty} />
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-gray-500">No violations recorded</p>
+              )}
             </div>
-          ))
-        ) : (
-          <p className="text-sm text-gray-500">No accidents recorded</p>
-        )}
-        <div className="mt-5 pt-5 border-t border-gray-100">
-          {app.no_violations ? (
-            <p className="text-sm text-gray-500">No violations reported</p>
-          ) : violations.length > 0 ? (
-            violations.map((viol, i) => (
-              <div key={i} className={i > 0 ? "mt-4 pt-4 border-t border-gray-100" : ""}>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Violation {i + 1}</p>
-                <Row label="Date" value={viol.date} />
-                <Row label="Location" value={viol.location} />
-                <Row label="Charge" value={viol.charge} />
-                <Row label="Penalty" value={viol.penalty} />
-              </div>
-            ))
-          ) : (
-            <p className="text-sm text-gray-500">No violations recorded</p>
-          )}
-        </div>
-      </Section>
+          </div>
+        );
+      })()}
 
       {/* Drug & Alcohol */}
-      <Section title="Drug & Alcohol History">
-        <Row label="Tested positive (DOT)" value={app.positive_test as string} />
-        <Row label="Refused DOT test" value={app.refused_test as string} />
-        <Row label="Return-to-duty plan" value={app.return_duty as string} />
-        {(app.sapd_info as string | null) && <Row label="Details" value={app.sapd_info as string} />}
-      </Section>
+      {(() => {
+        const anyYes = [app.positive_test, app.refused_test, app.return_duty].some(v => (v as string)?.toLowerCase() === "yes");
+        return (
+          <div className={`rounded-xl border p-5 md:p-6 ${anyYes ? "bg-red-50 border-red-200" : "bg-white border-gray-200"}`}>
+            <h2 className={`text-sm font-semibold uppercase tracking-wide mb-4 ${anyYes ? "text-red-700" : "text-gray-500"}`}>
+              {anyYes ? "⚠ Drug & Alcohol History — FLAGGED" : "Drug & Alcohol History"}
+            </h2>
+            <Row label="Tested positive (DOT)" value={app.positive_test as string} flag />
+            <Row label="Refused DOT test" value={app.refused_test as string} flag />
+            <Row label="Return-to-duty plan" value={app.return_duty as string} flag />
+            {(app.sapd_info as string | null) && <Row label="Details" value={app.sapd_info as string} />}
+          </div>
+        );
+      })()}
 
       {/* Signature */}
       <Section title="Certification & Signature">
