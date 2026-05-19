@@ -77,4 +77,17 @@ export async function createTables() {
     EXCEPTION WHEN undefined_column THEN NULL;
     END $$
   `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS company_documents (
+      id TEXT PRIMARY KEY,
+      uploaded_at TIMESTAMPTZ DEFAULT NOW(),
+      name TEXT NOT NULL,
+      category TEXT NOT NULL,
+      expires TEXT,
+      url TEXT NOT NULL,
+      file_size INTEGER,
+      content_type TEXT
+    );
+  `;
 }
