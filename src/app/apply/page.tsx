@@ -102,6 +102,12 @@ const t = {
     certText: "I certify that all information provided in this application is true, complete, and accurate. I understand that falsification of any information may result in denial of employment or termination.",
     sigName: "Full Name (acts as signature)",
     sigDate: "Date",
+    // Validation
+    fieldsMissing: "Please complete all required fields before continuing.",
+    filesMissing: "Please upload required documents (CDL front, CDL back, Medical Certificate) and fill in all required fields.",
+    // New doc fields
+    medicalExpiry: "DOT Medical Certificate Expiration Date",
+    mvrDate: "MVR Date (most recent)",
 
     // Success
     successTitle: "Application Submitted!",
@@ -205,6 +211,12 @@ const t = {
     certText: "Waxaan xaqiijinayaa in dhammaan macluumaadka codsigan ku jira ay run tahay, buuxda, oo saxsan. Waxaan fahamsan ahay in been sheegidda macluumaadka kasta ay keeni karto diidmada shaqada ama joojinta.",
     sigName: "Magaca Buuxa (u adeegta saxiixa)",
     sigDate: "Taariikhda",
+    // Validation
+    fieldsMissing: "Fadlan buuxi dhammaan goobaha loo baahan yahay ka hor intaadan sii wadin.",
+    filesMissing: "Fadlan soo rar dukumiintiyada loo baahan yahay (CDL hore, CDL gadaal, Shahaadada Caafimaadka) oo buuxi dhammaan goobaha loo baahan yahay.",
+    // New doc fields
+    medicalExpiry: "Taariikhda Dhicitaanka Shahaadada Caafimaadka DOT",
+    mvrDate: "Taariikhda MVR (ugu dambeeyay)",
 
     // Success
     successTitle: "Codsiga Waa La Gudbiyay!",
@@ -254,10 +266,11 @@ function FileInput({ label, lang, onFile }: { label: string; lang: Lang; onFile?
   );
 }
 
-async function uploadFile(file: File, label: string): Promise<string | null> {
+async function uploadFile(file: File, label: string, appId: string): Promise<string | null> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("label", label);
+  fd.append("appId", appId);
   const res = await fetch("/api/upload", { method: "POST", body: fd });
   if (!res.ok) return null;
   const { url } = await res.json();
@@ -283,6 +296,9 @@ export default function ApplyPage() {
   const [violations, setViolations] = useState<Violation[]>([{ date: "", location: "", charge: "", penalty: "" }]);
   const [drug, setDrug] = useState({ positiveTest: "", refusedTest: "", returnDuty: "", sapdInfo: "" });
   const [sig, setSig] = useState({ name: "", date: "" });
+  const [medicalExpiry, setMedicalExpiry] = useState("");
+  const [mvrDate, setMvrDate] = useState("");
+  const [stepError, setStepError] = useState("");
 
   // File state
   const [files, setFiles] = useState<Record<string, File | null>>({
@@ -291,33 +307,82 @@ export default function ApplyPage() {
 
   const TOTAL = 6;
 
+  function validateStep(s: number): string {
+    if (s === 0) {
+      const missing = [
+        !personal.firstName && tr.firstName,
+        !personal.lastName && tr.lastName,
+        !personal.dob && tr.dob,
+        !personal.ssn && tr.ssn,
+        !personal.phone && tr.phone,
+        !personal.address && tr.address,
+        !personal.city && tr.city,
+        !personal.state && tr.state,
+        !personal.zip && tr.zip,
+      ].filter(Boolean) as string[];
+      return missing.length ? tr.fieldsMissing : "";
+    }
+    if (s === 1) {
+      const missing = [
+        !license.cdlNumber && tr.cdlNumber,
+        !license.cdlState && tr.cdlState,
+        !license.cdlClass && tr.cdlClass,
+        !license.cdlExpiry && tr.cdlExpiry,
+        !license.expYears && tr.expYears,
+      ].filter(Boolean) as string[];
+      return missing.length ? tr.fieldsMissing : "";
+    }
+    if (s === 4) {
+      const missing = [
+        !drug.positiveTest && tr.positiveTest,
+        !drug.refusedTest && tr.refusedTest,
+        !drug.returnDuty && tr.returnDuty,
+      ].filter(Boolean) as string[];
+      return missing.length ? tr.fieldsMissing : "";
+    }
+    if (s === 5) {
+      if (!files.cdlFront || !files.cdlBack || !files.medical || !medicalExpiry || !sig.name || !sig.date) {
+        return tr.filesMissing;
+      }
+    }
+    return "";
+  }
+
   function toggleArr(arr: string[], val: string): string[] {
     return arr.includes(val) ? arr.filter((x) => x !== val) : [...arr, val];
   }
 
   async function handleSubmit() {
+    const err = validateStep(5);
+    if (err) { setStepError(err); return; }
+
     setLoading(true);
     setSubmitError("");
+    setStepError("");
+
+    // Generate ID client-side so files are organized under the applicant's folder
+    const appId = "PT-" + Math.random().toString(36).slice(2, 8).toUpperCase();
 
     try {
       // Upload files concurrently (skip nulls)
       const [cdlFront, cdlBack, medical, mvr, other] = await Promise.all([
-        files.cdlFront ? uploadFile(files.cdlFront, "cdl-front") : Promise.resolve(null),
-        files.cdlBack ? uploadFile(files.cdlBack, "cdl-back") : Promise.resolve(null),
-        files.medical ? uploadFile(files.medical, "medical") : Promise.resolve(null),
-        files.mvr ? uploadFile(files.mvr, "mvr") : Promise.resolve(null),
-        files.other ? uploadFile(files.other, "other") : Promise.resolve(null),
+        files.cdlFront ? uploadFile(files.cdlFront, "cdl-front", appId) : Promise.resolve(null),
+        files.cdlBack ? uploadFile(files.cdlBack, "cdl-back", appId) : Promise.resolve(null),
+        files.medical ? uploadFile(files.medical, "medical", appId) : Promise.resolve(null),
+        files.mvr ? uploadFile(files.mvr, "mvr", appId) : Promise.resolve(null),
+        files.other ? uploadFile(files.other, "other", appId) : Promise.resolve(null),
       ]);
 
       const res = await fetch("/api/applications", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: appId,
           personal, license, employers,
           noAccidents, accidents,
           noViolations, violations,
           drug, sig,
-          docs: { cdlFront, cdlBack, medical, mvr, other },
+          docs: { cdlFront, cdlBack, medical, mvr, other, medicalExpiry, mvrDate },
         }),
       });
 
@@ -592,7 +657,9 @@ export default function ApplyPage() {
                 <FileInput label={tr.docCdlFront} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, cdlFront: f }))} />
                 <FileInput label={tr.docCdlBack} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, cdlBack: f }))} />
                 <FileInput label={tr.docMedical} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, medical: f }))} />
+                <Field label={tr.medicalExpiry} value={medicalExpiry} onChange={setMedicalExpiry} type="date" required />
                 <FileInput label={tr.docMvr} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, mvr: f }))} />
+                <Field label={tr.mvrDate} value={mvrDate} onChange={setMvrDate} type="date" />
                 <FileInput label={tr.docOther} lang={lang} onFile={(f) => setFiles((p) => ({ ...p, other: f }))} />
               </div>
 
@@ -609,8 +676,8 @@ export default function ApplyPage() {
             </div>
           )}
 
-          {submitError && (
-            <p className="mt-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{submitError}</p>
+          {(stepError || submitError) && (
+            <p className="mt-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3">{stepError || submitError}</p>
           )}
 
           {/* Nav buttons */}
@@ -626,7 +693,12 @@ export default function ApplyPage() {
             {step < TOTAL - 1 ? (
               <button
                 type="button"
-                onClick={() => setStep(step + 1)}
+                onClick={() => {
+                  const err = validateStep(step);
+                  if (err) { setStepError(err); return; }
+                  setStepError("");
+                  setStep(step + 1);
+                }}
                 className="px-6 py-2.5 text-sm font-medium bg-orange-500 hover:bg-orange-600 text-white rounded-lg transition-colors"
               >
                 {tr.next}

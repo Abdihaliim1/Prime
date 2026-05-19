@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 type Status = "new" | "reviewing" | "approved" | "rejected";
 
@@ -130,6 +131,7 @@ export default function ApplicationsClient({
                       <p className="text-xs font-mono text-gray-400">{app.id} · {formatDate(app.submitted_at)}</p>
                     </div>
                     <div className="flex gap-2">
+                      <Link href={`/applications/${app.id}`} className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600">View</Link>
                       {app.status === "new" && (
                         <button disabled={updating === app.id} onClick={() => updateStatus(app.id, "reviewing")} className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg text-gray-600">Review</button>
                       )}
@@ -186,6 +188,9 @@ export default function ApplicationsClient({
                         </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2">
+                            <Link href={`/applications/${app.id}`} className="text-xs text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
+                              View
+                            </Link>
                             {app.status === "new" && (
                               <button disabled={updating === app.id} onClick={() => updateStatus(app.id, "reviewing")} className="text-xs text-gray-600 hover:text-gray-900 px-3 py-1.5 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors">
                                 Review

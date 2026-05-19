@@ -1,41 +1,106 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
+import { sql } from "@/lib/db";
+import { ADMIN_AUTH_COOKIE, verifyAdminToken } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Overview – Prime Trucking" };
+export const dynamic = "force-dynamic";
 
-const complianceSummary = [
-  { label: "Total Drivers", value: "24", sub: "3 pending onboarding" },
-  { label: "Fully Compliant", value: "18", sub: "75% of drivers", positive: true },
-  { label: "Action Required", value: "4", sub: "Docs expiring / missing", positive: false },
-  { label: "Non-Compliant", value: "2", sub: "Immediate attention needed", positive: false },
-];
+function daysUntil(dateStr: string | null): number | null {
+  if (!dateStr) return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+  return Math.ceil((d.getTime() - Date.now()) / 86400000);
+}
 
-const expiringDocs = [
-  { driver: "James Okonkwo", doc: "DOT Medical Certificate", expires: "Jun 2, 2026", daysLeft: 14, cdl: "CDL-A #TX-84921" },
-  { driver: "Maria Santos", doc: "Annual Vehicle Inspection", expires: "Jun 15, 2026", daysLeft: 27, cdl: "CDL-B #TX-20381" },
-  { driver: "Derek Holt", doc: "Commercial Driver's License", expires: "Jul 1, 2026", daysLeft: 43, cdl: "CDL-A #TX-11204" },
-  { driver: "Priya Nair", doc: "Hazmat Endorsement", expires: "Jul 10, 2026", daysLeft: 52, cdl: "CDL-A #TX-93847" },
-];
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
 
-const recentActivity = [
-  { driver: "Carlos Mendez", action: "Uploaded Drug Test Results", time: "2 hours ago" },
-  { driver: "James Okonkwo", action: "Profile updated", time: "Yesterday" },
-  { driver: "Sarah Kim", action: "Medical certificate renewed", time: "May 17" },
-  { driver: "Derek Holt", action: "Added to system", time: "May 15" },
-];
+export default async function OverviewPage() {
+  const cookieStore = await cookies();
+  const auth = cookieStore.get(ADMIN_AUTH_COOKIE)?.value;
+  if (!(await verifyAdminToken(auth))) return null;
 
-const nonCompliant = [
-  { driver: "Tony Reeves", cdl: "CDL-A #TX-48201", issue: "Medical cert expired May 1", avatar: "TR" },
-  { driver: "Amanda Brooks", cdl: "CDL-B #TX-30912", issue: "Missing IFTA license", avatar: "AB" },
-];
+  // All queries gracefully degrade if DB not provisioned
+  let totalApps = 0, newApps = 0, reviewingApps = 0, approvedApps = 0;
+  let expiringItems: { name: string; doc: string; expires: string; daysLeft: number; id: string }[] = [];
+  let recentApps: { id: string; first_name: string | null; last_name: string | null; submitted_at: string; status: string }[] = [];
+  let dbReady = true;
 
-export default function OverviewPage() {
+  try {
+    const { rows: counts } = await sql`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status = 'new')::int AS new_count,
+        COUNT(*) FILTER (WHERE status = 'reviewing')::int AS reviewing_count,
+        COUNT(*) FILTER (WHERE status = 'approved')::int AS approved_count
+      FROM applications
+    `;
+    totalApps = counts[0].total;
+    newApps = counts[0].new_count;
+    reviewingApps = counts[0].reviewing_count;
+    approvedApps = counts[0].approved_count;
+
+    // Fetch all approved drivers' expiry info
+    const { rows: drivers } = await sql`
+      SELECT id, first_name, last_name, cdl_number, cdl_state, cdl_class, cdl_expiry, medical_expiry
+      FROM applications
+      WHERE status = 'approved'
+    `;
+
+    for (const d of drivers) {
+      const name = [d.first_name, d.last_name].filter(Boolean).join(" ") || "Unknown";
+      const cdlId = [d.cdl_class, d.cdl_state && d.cdl_number ? `${d.cdl_state}-${d.cdl_number}` : null].filter(Boolean).join(" ") || d.id;
+
+      const cdlDays = daysUntil(d.cdl_expiry as string | null);
+      if (cdlDays !== null && cdlDays <= 90) {
+        expiringItems.push({ name, doc: "Commercial Driver's License", expires: d.cdl_expiry as string, daysLeft: cdlDays, id: d.id as string });
+      }
+
+      const medDays = daysUntil(d.medical_expiry as string | null);
+      if (medDays !== null && medDays <= 90) {
+        expiringItems.push({ name, doc: "DOT Medical Certificate", expires: d.medical_expiry as string, daysLeft: medDays, id: d.id as string });
+      }
+
+      void cdlId;
+    }
+
+    expiringItems.sort((a, b) => a.daysLeft - b.daysLeft);
+
+    const { rows: recent } = await sql`
+      SELECT id, first_name, last_name, submitted_at, status
+      FROM applications
+      ORDER BY submitted_at DESC
+      LIMIT 5
+    `;
+    recentApps = recent as typeof recentApps;
+  } catch {
+    dbReady = false;
+  }
+
+  const complianceSummary = [
+    { label: "Applications", value: totalApps.toString(), sub: `${newApps} new · ${reviewingApps} reviewing` },
+    { label: "Approved Drivers", value: approvedApps.toString(), sub: approvedApps > 0 ? "Active in system" : "None yet", positive: approvedApps > 0 },
+    { label: "Expiring (90d)", value: expiringItems.filter(i => i.daysLeft >= 0).length.toString(), sub: "CDL or medical cert", positive: expiringItems.filter(i => i.daysLeft >= 0).length === 0 },
+    { label: "Expired", value: expiringItems.filter(i => i.daysLeft < 0).length.toString(), sub: "Needs immediate action", positive: false },
+  ];
+
+  const expired = expiringItems.filter(i => i.daysLeft < 0);
+
   return (
     <div className="p-4 md:p-8 space-y-6">
       <div>
         <h1 className="text-xl md:text-2xl font-semibold text-gray-900">Compliance Overview</h1>
-        <p className="text-sm text-gray-500 mt-1">Monday, May 19 · 24 drivers in system</p>
+        <p className="text-sm text-gray-500 mt-1">Prime Trucking LLC · USDOT #4341809</p>
       </div>
+
+      {!dbReady && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 text-sm text-amber-800">
+          <strong>Database not connected.</strong> Visit <code className="font-mono">/api/setup</code> once after provisioning Postgres.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {complianceSummary.map((s) => (
@@ -49,27 +114,19 @@ export default function OverviewPage() {
         ))}
       </div>
 
-      {nonCompliant.length > 0 && (
+      {expired.length > 0 && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 md:p-5">
-          <h2 className="text-sm font-semibold text-red-800 mb-3">Non-Compliant — Immediate Action Required</h2>
+          <h2 className="text-sm font-semibold text-red-800 mb-3">Expired — Immediate Action Required</h2>
           <div className="space-y-2">
-            {nonCompliant.map((d) => (
-              <div key={d.driver} className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white border border-red-100 rounded-lg px-4 py-3 gap-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-red-100 text-red-700 flex items-center justify-center text-xs font-semibold shrink-0">
-                    {d.avatar}
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{d.driver}</p>
-                    <p className="text-xs text-gray-500">{d.cdl}</p>
-                  </div>
+            {expired.map((item) => (
+              <div key={item.id + item.doc} className="flex flex-col sm:flex-row sm:items-center sm:justify-between bg-white border border-red-100 rounded-lg px-4 py-3 gap-2">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{item.name}</p>
+                  <p className="text-xs text-red-600">{item.doc} expired {item.expires}</p>
                 </div>
-                <div className="flex items-center justify-between pl-11 sm:pl-0 sm:gap-4">
-                  <p className="text-xs text-red-600">{d.issue}</p>
-                  <Link href="/documents" className="text-xs font-medium text-red-700 underline underline-offset-2 ml-4 shrink-0">
-                    Resolve
-                  </Link>
-                </div>
+                <Link href={`/applications/${item.id}`} className="text-xs font-medium text-red-700 underline underline-offset-2 self-start sm:self-auto shrink-0">
+                  View Application
+                </Link>
               </div>
             ))}
           </div>
@@ -79,46 +136,53 @@ export default function OverviewPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-900">Expiring Documents</h2>
-            <Link href="/documents" className="text-xs text-orange-500 hover:underline font-medium">View all</Link>
+            <h2 className="text-base font-semibold text-gray-900">Expiring Soon (90 days)</h2>
+            <Link href="/applications" className="text-xs text-orange-500 hover:underline font-medium">All applications</Link>
           </div>
-          <div className="space-y-3">
-            {expiringDocs.map((item) => (
-              <div key={item.driver + item.doc} className="flex items-start justify-between py-2 border-b border-gray-50 last:border-0">
-                <div className="flex-1 min-w-0 pr-3">
-                  <p className="text-sm font-medium text-gray-900 truncate">{item.driver}</p>
-                  <p className="text-xs text-gray-500 mt-0.5 truncate">{item.doc}</p>
-                  <p className="text-xs text-gray-400">{item.cdl}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${item.daysLeft <= 14 ? "bg-red-100 text-red-700" : item.daysLeft <= 30 ? "bg-amber-100 text-amber-700" : "bg-yellow-50 text-yellow-700"}`}>
-                    {item.daysLeft}d
-                  </span>
-                  <p className="text-xs text-gray-400 mt-1">{item.expires}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          {expiringItems.filter(i => i.daysLeft >= 0).length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">No documents expiring within 90 days</p>
+          ) : (
+            <div className="space-y-3">
+              {expiringItems.filter(i => i.daysLeft >= 0).slice(0, 6).map((item) => (
+                <Link key={item.id + item.doc} href={`/applications/${item.id}`} className="flex items-start justify-between py-2 border-b border-gray-50 last:border-0 hover:bg-gray-50 rounded -mx-2 px-2 transition-colors">
+                  <div className="flex-1 min-w-0 pr-3">
+                    <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5 truncate">{item.doc}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${item.daysLeft <= 14 ? "bg-red-100 text-red-700" : item.daysLeft <= 30 ? "bg-amber-100 text-amber-700" : "bg-yellow-50 text-yellow-700"}`}>
+                      {item.daysLeft}d
+                    </span>
+                    <p className="text-xs text-gray-400 mt-1">{item.expires}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Recent Activity</h2>
-          <div className="space-y-4">
-            {recentActivity.map((item, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full bg-gray-100 flex items-center justify-center text-xs font-semibold text-gray-600 shrink-0 mt-0.5">
-                  {item.driver.split(" ").map((n) => n[0]).join("")}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-900">
-                    <span className="font-medium">{item.driver}</span>
-                    <span className="text-gray-500"> · {item.action}</span>
-                  </p>
-                  <p className="text-xs text-gray-400 mt-0.5">{item.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h2 className="text-base font-semibold text-gray-900 mb-4">Recent Applications</h2>
+          {recentApps.length === 0 ? (
+            <p className="text-sm text-gray-400 py-4 text-center">No applications yet</p>
+          ) : (
+            <div className="space-y-4">
+              {recentApps.map((app) => {
+                const name = [app.first_name, app.last_name].filter(Boolean).join(" ") || "Unknown";
+                return (
+                  <Link key={app.id} href={`/applications/${app.id}`} className="flex items-start gap-3 hover:bg-gray-50 rounded -mx-2 px-2 py-1 transition-colors">
+                    <div className="w-7 h-7 rounded-full bg-orange-100 text-orange-700 flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5">
+                      {((app.first_name?.[0] ?? "") + (app.last_name?.[0] ?? "")).toUpperCase() || "?"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-900 font-medium truncate">{name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{formatDate(app.submitted_at)} · {app.status}</p>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>

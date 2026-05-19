@@ -2,7 +2,6 @@ import { sql } from "@vercel/postgres";
 
 export { sql };
 
-// Run once to create tables — call /api/setup to initialize
 export async function createTables() {
   await sql`
     CREATE TABLE IF NOT EXISTS applications (
@@ -60,7 +59,15 @@ export async function createTables() {
       doc_cdl_back TEXT,
       doc_medical TEXT,
       doc_mvr TEXT,
-      doc_other TEXT
+      doc_other TEXT,
+
+      -- Doc expiry / dates
+      medical_expiry TEXT,
+      mvr_date TEXT
     );
   `;
+
+  // Migrate existing tables — safe to run repeatedly
+  await sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS medical_expiry TEXT`;
+  await sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS mvr_date TEXT`;
 }

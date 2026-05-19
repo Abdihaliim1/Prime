@@ -7,8 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    const id =
-      "PT-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const id = body.id ?? ("PT-" + Math.random().toString(36).slice(2, 8).toUpperCase());
 
     await sql`
       INSERT INTO applications (
@@ -22,7 +21,8 @@ export async function POST(req: NextRequest) {
         no_accidents, accidents, no_violations, violations,
         positive_test, refused_test, return_duty, sapd_info,
         sig_name, sig_date,
-        doc_cdl_front, doc_cdl_back, doc_medical, doc_mvr, doc_other
+        doc_cdl_front, doc_cdl_back, doc_medical, doc_mvr, doc_other,
+        medical_expiry, mvr_date
       ) VALUES (
         ${id}, 'new',
         ${body.personal?.firstName ?? null},
@@ -62,7 +62,9 @@ export async function POST(req: NextRequest) {
         ${body.docs?.cdlBack ?? null},
         ${body.docs?.medical ?? null},
         ${body.docs?.mvr ?? null},
-        ${body.docs?.other ?? null}
+        ${body.docs?.other ?? null},
+        ${body.docs?.medicalExpiry ?? null},
+        ${body.docs?.mvrDate ?? null}
       )
     `;
 
