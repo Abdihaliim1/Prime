@@ -122,7 +122,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       <Section title="Personal Information">
         <Row label="Full Name" value={[app.first_name, app.middle_name, app.last_name].filter(Boolean).join(" ")} />
         <Row label="Date of Birth" value={app.dob as string} />
-        <Row label="SSN (last 4)" value={app.ssn_last4 as string} />
+        <Row label="SSN" value={app.ssn as string} />
         <Row label="Phone" value={app.phone as string} />
         <Row label="Email" value={app.email as string} />
         <Row label="Address" value={[app.address, app.city, app.state, app.zip].filter(Boolean).join(", ")} />

@@ -26,7 +26,7 @@ const t = {
     middleName: "Middle Name",
     lastName: "Last Name",
     dob: "Date of Birth",
-    ssn: "Social Security Number (last 4 digits)",
+    ssn: "Social Security Number",
     phone: "Phone Number",
     email: "Email Address",
     address: "Street Address",
@@ -135,7 +135,7 @@ const t = {
     middleName: "Magaca Dhexe",
     lastName: "Magaca Dambe",
     dob: "Taariikhda Dhalashada",
-    ssn: "Nambarka SSN (4-ta Ugu Dambeeysa)",
+    ssn: "Nambarka Amniga Bulshada (SSN)",
     phone: "Nambarka Telefoonka",
     email: "Cinwaanka Iimaaylka",
     address: "Cinwaanka Jidka",
@@ -307,13 +307,20 @@ export default function ApplyPage() {
 
   const TOTAL = 6;
 
+  function formatSSN(raw: string): string {
+    const digits = raw.replace(/\D/g, "").slice(0, 9);
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 5) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5)}`;
+  }
+
   function validateStep(s: number): string {
     if (s === 0) {
       const missing = [
         !personal.firstName && tr.firstName,
         !personal.lastName && tr.lastName,
         !personal.dob && tr.dob,
-        !personal.ssn && tr.ssn,
+        (personal.ssn.replace(/\D/g, "").length < 9) && tr.ssn,
         !personal.phone && tr.phone,
         !personal.address && tr.address,
         !personal.city && tr.city,
@@ -490,7 +497,7 @@ export default function ApplyPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={tr.dob} value={personal.dob} onChange={(v) => setPersonal({ ...personal, dob: v })} type="date" required />
-                <Field label={tr.ssn} value={personal.ssn} onChange={(v) => setPersonal({ ...personal, ssn: v })} maxLength={4} placeholder="####" required />
+                <Field label={tr.ssn} value={personal.ssn} onChange={(v) => setPersonal({ ...personal, ssn: formatSSN(v) })} maxLength={11} placeholder="XXX-XX-XXXX" required />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label={tr.phone} value={personal.phone} onChange={(v) => setPersonal({ ...personal, phone: v })} type="tel" required />

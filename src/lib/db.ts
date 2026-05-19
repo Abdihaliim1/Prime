@@ -14,7 +14,7 @@ export async function createTables() {
       middle_name TEXT,
       last_name TEXT,
       dob TEXT,
-      ssn_last4 TEXT,
+      ssn TEXT,
       phone TEXT,
       email TEXT,
       address TEXT,
@@ -70,4 +70,11 @@ export async function createTables() {
   // Migrate existing tables — safe to run repeatedly
   await sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS medical_expiry TEXT`;
   await sql`ALTER TABLE applications ADD COLUMN IF NOT EXISTS mvr_date TEXT`;
+  // Rename ssn_last4 → ssn (full SSN now collected)
+  await sql`
+    DO $$ BEGIN
+      ALTER TABLE applications RENAME COLUMN ssn_last4 TO ssn;
+    EXCEPTION WHEN undefined_column THEN NULL;
+    END $$
+  `;
 }

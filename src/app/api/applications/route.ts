@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
     await sql`
       INSERT INTO applications (
         id, status,
-        first_name, middle_name, last_name, dob, ssn_last4,
+        first_name, middle_name, last_name, dob, ssn,
         phone, email, address, city, state, zip,
         years_at_address, prev_address,
         cdl_number, cdl_state, cdl_class, cdl_expiry,
