@@ -62,3 +62,31 @@ export async function GET(
   if (!rows.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ application: rows[0] });
 }
+
+// DELETE /api/applications/:id — remove application + all uploaded docs (admin only)
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const auth = req.cookies.get(ADMIN_AUTH_COOKIE)?.value;
+  if (!(await verifyAdminToken(auth))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+
+  // Fetch the app to get its blob URLs before deleting
+  const { rows } = await sql`
+    SELECT doc_cdl_front, doc_cdl_back, doc_medical, doc_mvr, doc_other
+    FROM applications WHERE id = ${id}
+  `;
+  if (!rows.length) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  // Remove every uploaded file from Blob storage
+  const urls = [rows[0].doc_cdl_front, rows[0].doc_cdl_back, rows[0].doc_medical, rows[0].doc_mvr, rows[0].doc_other]
+    .filter((u): u is string => typeof u === "string" && u.length > 0);
+  for (const url of urls) {
+    try { await del(url); } catch { /* blob may already be gone */ }
+  }
+
+  await sql`DELETE FROM applications WHERE id = ${id}`;
+  return NextResponse.json({ ok: true });
+}

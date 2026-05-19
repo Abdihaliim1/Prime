@@ -5,6 +5,7 @@ import Link from "next/link";
 import { sql } from "@/lib/db";
 import { ADMIN_AUTH_COOKIE, verifyAdminToken } from "@/lib/auth";
 import { DeleteDocButton } from "./DeleteDocButton";
+import { DeleteApplicationButton } from "./DeleteApplicationButton";
 
 export const metadata: Metadata = { title: "Application Detail – Prime Trucking" };
 export const dynamic = "force-dynamic";
@@ -263,6 +264,18 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         <Row label="Signed by" value={app.sig_name as string} />
         <Row label="Signature date" value={app.sig_date as string} />
       </Section>
+
+      {/* Danger zone */}
+      <div className="rounded-xl border border-red-200 bg-red-50 p-5 md:p-6">
+        <h2 className="text-sm font-semibold text-red-700 uppercase tracking-wide mb-2">Danger Zone</h2>
+        <p className="text-sm text-gray-600 mb-4">
+          Permanently delete this application and every document the driver uploaded. This action cannot be undone.
+        </p>
+        <DeleteApplicationButton
+          appId={id}
+          driverName={[app.first_name, app.last_name].filter(Boolean).join(" ") || "Unknown driver"}
+        />
+      </div>
     </div>
   );
 }
