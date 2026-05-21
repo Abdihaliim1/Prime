@@ -266,11 +266,14 @@ function FileInput({ label, lang, onFile }: { label: string; lang: Lang; onFile?
   );
 }
 
-async function uploadFile(file: File, label: string, appId: string): Promise<string> {
+async function uploadFile(file: File, label: string, appId: string, driver: { firstName: string; lastName: string; dob: string }): Promise<string> {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("label", label);
   fd.append("appId", appId);
+  fd.append("firstName", driver.firstName);
+  fd.append("lastName", driver.lastName);
+  fd.append("dob", driver.dob);
   const res = await fetch("/api/upload", { method: "POST", body: fd });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? `Failed to upload ${label} — check Blob storage is connected in Vercel.`);
@@ -369,15 +372,16 @@ export default function ApplyPage() {
 
     // Generate ID client-side so files are organized under the applicant's folder
     const appId = "PT-" + Math.random().toString(36).slice(2, 8).toUpperCase();
+    const driver = { firstName: personal.firstName, lastName: personal.lastName, dob: personal.dob };
 
     try {
       // Upload files concurrently (skip nulls)
       const [cdlFront, cdlBack, medical, mvr, other] = await Promise.all([
-        files.cdlFront ? uploadFile(files.cdlFront, "cdl-front", appId) : Promise.resolve(null),
-        files.cdlBack ? uploadFile(files.cdlBack, "cdl-back", appId) : Promise.resolve(null),
-        files.medical ? uploadFile(files.medical, "medical", appId) : Promise.resolve(null),
-        files.mvr ? uploadFile(files.mvr, "mvr", appId) : Promise.resolve(null),
-        files.other ? uploadFile(files.other, "other", appId) : Promise.resolve(null),
+        files.cdlFront ? uploadFile(files.cdlFront, "cdl-front", appId, driver) : Promise.resolve(null),
+        files.cdlBack ? uploadFile(files.cdlBack, "cdl-back", appId, driver) : Promise.resolve(null),
+        files.medical ? uploadFile(files.medical, "medical", appId, driver) : Promise.resolve(null),
+        files.mvr ? uploadFile(files.mvr, "mvr", appId, driver) : Promise.resolve(null),
+        files.other ? uploadFile(files.other, "other", appId, driver) : Promise.resolve(null),
       ]);
 
       const res = await fetch("/api/applications", {
