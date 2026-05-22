@@ -1,23 +1,24 @@
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { handleUpload } from "@vercel/blob/client";
 import { NextResponse } from "next/server";
+
+export const runtime = "nodejs";
 
 // Issues short-lived upload tokens so the browser can upload files
 // directly to Vercel Blob, bypassing the 4.5 MB serverless function body limit.
-export async function POST(request: Request): Promise<NextResponse> {
-  const body = (await request.json()) as HandleUploadBody;
+export async function POST(request: Request) {
+  const body = await request.json();
 
   try {
     const jsonResponse = await handleUpload({
       body,
       request,
-      onBeforeGenerateToken: async (pathname) => {
-        // Only allow uploads to the drivers/ folder (driver application form)
+      onBeforeGenerateToken: async (pathname: string) => {
         if (!pathname.startsWith("drivers/")) {
           throw new Error("Invalid upload path");
         }
         return {
           allowedContentTypes: ["image/jpeg", "image/jpg", "image/png", "application/pdf"],
-          maximumSizeInBytes: 15 * 1024 * 1024, // 15 MB cap (generous for trucking docs)
+          maximumSizeInBytes: 15 * 1024 * 1024,
           addRandomSuffix: true,
         };
       },
