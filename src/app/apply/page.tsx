@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { upload } from "@vercel/blob/client";
 
 type Lang = "en" | "so";
 
@@ -266,18 +267,35 @@ function FileInput({ label, lang, onFile }: { label: string; lang: Lang; onFile?
   );
 }
 
+function sanitizePart(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9-]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "")
+    .slice(0, 40) || "unknown";
+}
+
 async function uploadFile(file: File, label: string, appId: string, driver: { firstName: string; lastName: string; dob: string }): Promise<string> {
-  const fd = new FormData();
-  fd.append("file", file);
-  fd.append("label", label);
-  fd.append("appId", appId);
-  fd.append("firstName", driver.firstName);
-  fd.append("lastName", driver.lastName);
-  fd.append("dob", driver.dob);
-  const res = await fetch("/api/upload", { method: "POST", body: fd });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `Failed to upload ${label} — check Blob storage is connected in Vercel.`);
-  return data.url as string;
+  const driverFolder = (driver.lastName || driver.firstName || driver.dob)
+    ? `${sanitizePart(driver.lastName)}_${sanitizePart(driver.firstName)}_${sanitizePart(driver.dob)}`
+    : "unknown_driver";
+  const ext = file.name.split(".").pop() ?? "bin";
+  const pathname = `drivers/${driverFolder}/${appId}/${label}.${ext}`;
+
+  try {
+    // Client upload — file goes browser → Blob directly, bypassing 4.5 MB function limit
+    const blob = await upload(pathname, file, {
+      access: "public",
+      handleUploadUrl: "/api/upload-token",
+      contentType: file.type,
+    });
+    return blob.url;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : `Failed to upload ${label}`;
+    throw new Error(msg);
+  }
 }
 
 export default function ApplyPage() {
